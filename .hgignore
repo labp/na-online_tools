@@ -1,0 +1,13 @@
+syntax: glob
+
+^bin/
+
+# Compiled files
+*.so
+*.a
+.o
+
+# IDE project settings
+.cproject
+.project
+.settings
