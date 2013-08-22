@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <sstream>
 
@@ -15,15 +16,19 @@
 
 #include "ReaderBND.h"
 
-using std::cout;
 using std::cerr;
+using std::cout;
 using std::endl;
+using std::numeric_limits;
 using std::string;
-using std::istringstream;
+using std::stringstream;
+using std::vector;
 
 void printHelp();
-bool parseArguments( int argc, char *argv[], string* const iFile, string* const oFile, size_t* const skip );
+bool parseArguments( int argc, char *argv[], string* const iFile, string* const oFile, size_t* const skip,
+                float* const cutBottom );
 void printForwardCmd( const string& oFile );
+size_t removeBottomPoints( vector< ReaderBND::PointT >& points, float cutFactor );
 
 int main( int argc, char *argv[] )
 {
@@ -31,11 +36,11 @@ int main( int argc, char *argv[] )
     cout << "--------------------" << endl;
 
     // parsing arguments
-
     string iFile, oFile;
     size_t skip = 1;
+    float cutBottom = 0.33;
 
-    if( !parseArguments( argc, argv, &iFile, &oFile, &skip ) )
+    if( !parseArguments( argc, argv, &iFile, &oFile, &skip, &cutBottom ) )
     {
         return EXIT_FAILURE;
     }
@@ -43,9 +48,12 @@ int main( int argc, char *argv[] )
     cout << endl;
     cout << "Reading BEM file from:\n   " << iFile << endl;
     ReaderBND reader( iFile );
-    std::vector< ReaderBND::PointT > points;
+    vector< ReaderBND::PointT > points;
     reader.readPositions( &points );
     cout << "Read " << points.size() << " positions." << endl;
+    cout << "Removing bottom sphere points and downer part of BEM layer." << endl;
+    removeBottomPoints( points, cutBottom );
+    cout << points.size() << " positions left." << endl;
 
     cout << endl;
     cout << "Open output FIFF ..." << endl;
@@ -110,14 +118,17 @@ void printHelp()
     cout << "   -i <Input BEM file>" << endl;
     cout << "   -o <Output FIFF file>" << endl;
     cout << "   -s <skip> (optional: take every ... point from input)" << endl;
+    cout << "   -c <cut bottom factor> (optional: remove points of the bottom sphere, 0 keeps all points - standard: 0.33)"
+                    << endl;
 }
 
-bool parseArguments( int argc, char *argv[], string* const iFile, string* const oFile, size_t* const skip )
+bool parseArguments( int argc, char *argv[], string* const iFile, string* const oFile, size_t* const skip,
+                float* const cutBottom )
 {
     opterr = 0;
     int c;
     char iFlag = 0, oFlag = 0;
-    while( ( c = getopt( argc, argv, "i:o:s:h" ) ) != -1 )
+    while( ( c = getopt( argc, argv, "i:o:s:hc:" ) ) != -1 )
     {
         switch( c )
         {
@@ -131,12 +142,23 @@ bool parseArguments( int argc, char *argv[], string* const iFile, string* const 
                 break;
             case 's':
             {
-                istringstream ss( optarg );
+                stringstream ss( optarg );
                 ss >> *skip;
             }
                 if( *skip < 1 )
                 {
                     cerr << "Wrong argument for skip!" << endl;
+                    return false;
+                }
+                break;
+            case 'c':
+            {
+                stringstream ss( optarg );
+                ss >> *cutBottom;
+            }
+                if( *cutBottom < 0 || *cutBottom > 1 )
+                {
+                    cerr << "cutBottom must be between 0.0 and 1.0!" << endl;
                     return false;
                 }
                 break;
@@ -169,9 +191,49 @@ void printForwardCmd( const string& oFile )
     cout << "----------------------------------------------------\n" << endl;
     cout << "mne_forward_solution --eeg --fixed \\\n";
     cout << "--src <source file> \\\n";
-    cout << "--mri <COR file> \\\n";
+    cout << "--trans <ASCII file containing a 4x4 identity matrix > \\\n";
     cout << "--meas " << oFile << " \\\n";
     cout << "--bem <BEM layer file> \\\n";
     cout << "--fwd <output file for forward solution>" << endl;
     cout << "\n----------------------------------------------------" << endl;
+}
+
+size_t removeBottomPoints( vector< ReaderBND::PointT >& points, float cutFactor )
+{
+    size_t removed = 0;
+
+    // Find min and max of z-values
+    ReaderBND::PointT::Scalar min = numeric_limits< ReaderBND::PointT::Scalar >::max();
+    ReaderBND::PointT::Scalar max = numeric_limits< ReaderBND::PointT::Scalar >::min();
+    vector< ReaderBND::PointT >::const_iterator cit;
+    for( cit = points.begin(); cit != points.end(); ++cit )
+    {
+        const ReaderBND::PointT::Scalar z = cit->z();
+        if( z < min )
+        {
+            min = z;
+        }
+        if( z > max )
+        {
+            max = z;
+        }
+    }
+
+    // Remove bottom points
+    const ReaderBND::PointT::Scalar z_threashold = min + ( max - min ) * cutFactor;
+    vector< ReaderBND::PointT >::iterator it;
+    for( it = points.begin(); it != points.end(); )
+    {
+        if( it->z() < z_threashold )
+        {
+            it = points.erase( it );
+            ++removed;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    return removed;
 }
