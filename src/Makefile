@@ -12,10 +12,10 @@ QT5_LIBRARY_PATH=/opt/lib/qt5
 # Prepare compiler and linker variables
 INCLUDES=-I$(EIGEN_INCLUDE_PATH) -I$(MNE_INCLUDE_PATH) -I$(QT5_INCLUDE_PATH) -I$(QT5CORE_INCLUDE_PATH)
 LDFLAGS=-L$(MNE_LIBRARY_PATH) -L$(QT5_LIBRARY_PATH)
-LIBS=-lQt5Core -lMNE1Fiff -lQt5Network -lMNE1Mne -lMNE1Utils -lMNE1Fs
+LIBS=-lQt5Core -lMNE1Fiff -lQt5Network -lMNE1Mne -lMNE1Fiff -lQt5Network -lMNE1Utils -lMNE1Fs
 
 # Setup project files
-OBJS=eeg_sensor_generator.o ReaderBND.o
+OBJS=eeg_sensor_generator.o
 EXEC=eeg_sensor_generator
 
 # make rules

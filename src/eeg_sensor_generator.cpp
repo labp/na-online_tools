@@ -4,17 +4,18 @@
 #include <string>
 #include <sstream>
 
+#include <Eigen/Core>
+
 #include <QtCore/QFile>
 #include <QtCore/QString>
 
-#include <fiff/fiff_constants.h>
 #include <fiff/fiff.h>
-#include <fiff/fiff_info.h>
+#include <fiff/fiff_constants.h>
 #include <fiff/fiff_ch_info.h>
-#include <fiff/fiff_stream.h>
 #include <fiff/fiff_coord_trans.h>
-
-#include "ReaderBND.h"
+#include <fiff/fiff_info.h>
+#include <fiff/fiff_stream.h>
+#include <mne/mne_surface.h>
 
 using std::cerr;
 using std::cout;
@@ -24,18 +25,24 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+using namespace FIFFLIB;
+using namespace MNELIB;
+
+typedef Eigen::Vector3d PointT;
+
 void printHelp();
 bool parseArguments( int argc, char *argv[], string* const iFile, string* const oFile, size_t* const skip,
                 float* const cutBottom );
 void printForwardCmd( const string& oFile );
-size_t removeBottomPoints( vector< ReaderBND::PointT >& points, float cutFactor );
+size_t removeBottomPoints( vector< PointT >* const points, const MNESurface& surface, float cutFactor );
 
 int main( int argc, char *argv[] )
 {
     cout << "EEG SENSOR GENERATOR" << endl;
-    cout << "--------------------" << endl;
+    cout << "====================" << endl;
 
-    // parsing arguments
+    // Parse arguments //
+    //-----------------//
     string iFile, oFile;
     size_t skip = 1;
     float cutBottom = 0.33;
@@ -45,25 +52,62 @@ int main( int argc, char *argv[] )
         return EXIT_FAILURE;
     }
 
-    cout << endl;
-    cout << "Reading BEM file from:\n   " << iFile << endl;
-    ReaderBND reader( iFile );
-    vector< ReaderBND::PointT > points;
-    reader.readPositions( &points );
-    cout << "Read " << points.size() << " positions." << endl;
-    cout << "Removing bottom sphere points and downer part of BEM layer." << endl;
-    removeBottomPoints( points, cutBottom );
+    cout << "input: " << iFile << endl;
+    cout << "output: " << oFile << endl;
+    cout << "skip: " << skip << endl;
+    cout << "cutBottom: " << cutBottom << endl;
+
+    // Read BEM file //
+    //---------------//
+    cout << "--------------------" << endl;
+    cout << "Reading BEM file ..." << endl;
+
+    QFile file( QString::fromStdString( iFile ) );
+    QList< MNESurface::SPtr > surfaces;
+    if( !MNESurface::read( file, surfaces ) )
+    {
+        cerr << "Could not load BEM layers!" << endl;
+        return EXIT_FAILURE;
+    }
+
+    MNESurface::ConstSPtr outerSkin;
+    QList< MNESurface::SPtr >::ConstIterator cit;
+    for( cit = surfaces.begin(); cit != surfaces.end(); ++cit )
+    {
+        if( ( *cit )->id == FIFFV_BEM_SURF_ID_HEAD )
+        {
+            cout << "Found outer skin layer." << endl;
+            outerSkin = ( *cit );
+            break;
+        }
+    }
+
+    if( outerSkin.isNull() )
+    {
+        cerr << "Could not find BEM layer: outer skin" << endl;
+        return EXIT_FAILURE;
+    }
+    cout << "Read " << outerSkin->np << " positions." << endl;
+
+    // Remove points of bottom sphere //
+    //--------------------------------//
+    cout << "--------------------" << endl;
+    cout << "Removing points of bottom sphere ..." << endl;
+    vector< PointT > points;
+    removeBottomPoints( &points, *outerSkin, cutBottom );
     cout << points.size() << " positions left." << endl;
 
-    cout << endl;
-    cout << "Open output FIFF ..." << endl;
+    // Create and write FIFF file //
+    //----------------------------//
+    cout << "--------------------" << endl;
+    cout << "Opening output FIFF ..." << endl;
 
     QFile fileOut( QString::fromStdString( oFile ) );
-    FIFFLIB::FiffStream::SPtr fiffOutStream = FIFFLIB::FiffStream::start_file( fileOut );
+    FiffStream::SPtr fiffOutStream = FiffStream::start_file( fileOut );
 
-    FIFFLIB::FiffInfo fiffInfoOut;
+    FiffInfo fiffInfoOut;
 
-    FIFFLIB::FiffCoordTrans coordTrans;
+    FiffCoordTrans coordTrans;
     coordTrans.trans.setIdentity();
     coordTrans.invtrans.setIdentity();
     coordTrans.from = FIFFV_COORD_HEAD;
@@ -74,14 +118,14 @@ int main( int argc, char *argv[] )
     fiffInfoOut.dev_ctf_t = coordTrans;
     fiffInfoOut.dig_trans = coordTrans;
 
-    cout << "Create channel info ..." << endl;
+    cout << "Creating channel info ..." << endl;
 
     size_t count = 0;
-    cout << "Skip: " << skip << endl;
-    ReaderBND::PointT p;
+
+    PointT p;
     for( size_t ch = 0; ch < points.size(); ch += skip )
     {
-        FIFFLIB::FiffChInfo chInfo;
+        FiffChInfo chInfo;
         chInfo.coil_type = FIFFV_COIL_EEG;
         chInfo.kind = FIFFV_EEG_CH;
         chInfo.coil_trans.setIdentity();
@@ -90,9 +134,9 @@ int main( int argc, char *argv[] )
         chInfo.eeg_loc.col( 0 ) = p;
         chInfo.eeg_loc.col( 1 ) = p;
         chInfo.loc.setZero();
-        chInfo.loc( 0, 0 ) = p( 0 );
-        chInfo.loc( 1, 0 ) = p( 1 );
-        chInfo.loc( 2, 0 ) = p( 2 );
+        chInfo.loc( 0, 0 ) = p.x();
+        chInfo.loc( 1, 0 ) = p.y();
+        chInfo.loc( 2, 0 ) = p.z();
 
         fiffInfoOut.chs.append( chInfo );
         ++count;
@@ -101,12 +145,14 @@ int main( int argc, char *argv[] )
     fiffInfoOut.nchan = count;
     cout << "Took " << count << " positions." << endl;
 
-    cout << "Write FIFF to:\n   " << oFile << endl;
+    cout << "Writing FIFF ..." << endl;
 
     fiffOutStream->write_info_base( fiffInfoOut );
     fiffOutStream->end_file();
 
+    cout << "====================" << endl;
     cout << endl;
+
     printForwardCmd( oFile );
 
     return EXIT_SUCCESS;
@@ -198,17 +244,18 @@ void printForwardCmd( const string& oFile )
     cout << "\n----------------------------------------------------" << endl;
 }
 
-size_t removeBottomPoints( vector< ReaderBND::PointT >& points, float cutFactor )
+size_t removeBottomPoints( vector< PointT >* const points, const MNESurface& surface, float cutFactor )
 {
     size_t removed = 0;
+    const MNESurface::PointsT& sPoints = surface.rr;
 
-    // Find min and max of z-values
-    ReaderBND::PointT::Scalar min = numeric_limits< ReaderBND::PointT::Scalar >::max();
-    ReaderBND::PointT::Scalar max = numeric_limits< ReaderBND::PointT::Scalar >::min();
-    vector< ReaderBND::PointT >::const_iterator cit;
-    for( cit = points.begin(); cit != points.end(); ++cit )
+    // Find min and max of z-values //
+    //------------------------------//
+    MNESurface::PointsT::Scalar min = numeric_limits< MNESurface::PointsT::Scalar >::max();
+    MNESurface::PointsT::Scalar max = numeric_limits< MNESurface::PointsT::Scalar >::min();
+    for( MNESurface::PointsT::Index c = 0; c < sPoints.cols(); ++c )
     {
-        const ReaderBND::PointT::Scalar z = cit->z();
+        const MNESurface::PointsT::Scalar z = sPoints.col( c ).z();
         if( z < min )
         {
             min = z;
@@ -219,19 +266,19 @@ size_t removeBottomPoints( vector< ReaderBND::PointT >& points, float cutFactor 
         }
     }
 
-    // Remove bottom points
-    const ReaderBND::PointT::Scalar z_threashold = min + ( max - min ) * cutFactor;
-    vector< ReaderBND::PointT >::iterator it;
-    for( it = points.begin(); it != points.end(); )
+    // Remove bottom points //
+    //----------------------//
+    const MNESurface::PointsT::Scalar z_threashold = min + ( max - min ) * cutFactor;
+    for( MNESurface::PointsT::Index c = 0; c < sPoints.cols(); ++c )
     {
-        if( it->z() < z_threashold )
+        const PointT pIn = sPoints.col( c ).cast< double >();
+        if( pIn.z() > z_threashold )
         {
-            it = points.erase( it );
-            ++removed;
+            points->push_back( pIn );
         }
         else
         {
-            ++it;
+            ++removed;
         }
     }
 
