@@ -123,9 +123,11 @@ int main( int argc, char *argv[] )
     size_t count = 0;
 
     PointT p;
+    const QString eegName = "EEG";
     for( size_t ch = 0; ch < points.size(); ch += skip )
     {
         FiffChInfo chInfo;
+        chInfo.ch_name = eegName + ch;
         chInfo.coil_type = FIFFV_COIL_EEG;
         chInfo.kind = FIFFV_EEG_CH;
         chInfo.coil_trans.setIdentity();
