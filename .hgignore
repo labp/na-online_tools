@@ -5,7 +5,7 @@ syntax: glob
 # Compiled files
 *.so
 *.a
-.o
+*.o
 
 # IDE project settings
 .cproject
