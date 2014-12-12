@@ -34,48 +34,44 @@ IF( NOT CMAKE_BUILD_TYPE )
     SET( CMAKE_BUILD_TYPE Release )
 ENDIF( NOT CMAKE_BUILD_TYPE )
 
-IF( NOT EXISTS "$ENV{MNE_CPP_ROOT}" )
-    SET( MNE_CPP_ROOT ~/na-online_dependencies/mne-cpp )
-    MESSAGE( "Using default MNE_CPP_ROOT, set it with the environment variable: MNE_CPP_ROOT" )
-ELSEIF( NOT EXISTS "$ENV{MNE_CPP_ROOT}" )
-    SET( MNE_CPP_ROOT ENV{MNE_CPP_ROOT} )
-ENDIF( NOT EXISTS "$ENV{MNE_CPP_ROOT}" )
-MESSAGE( "MNE_CPP_ROOT: ${MNE_CPP_ROOT}" )
+SET( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../tools/cmake" )
+
+FIND_PACKAGE( Eigen3 3.1.0 REQUIRED )
+FIND_PACKAGE( Qt5Core REQUIRED )
+FIND_PACKAGE( MNE REQUIRED )
+
+# Support old CMake versions
+ADD_DEFINITIONS( ${Qt5Core_DEFINITIONS} )
+SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Core_EXECUTABLE_COMPILE_FLAGS}" )
+
 
 # --------------------------------------------------------------------------------------------------------------------------------
-# eeg_sensor_generator
+# nao_eeg_sensor_generator
 # --------------------------------------------------------------------------------------------------------------------------------
 
 SET( TARGET nao_eeg_sensor_generator )
 ADD_EXECUTABLE( ${TARGET} eeg_sensor_generator.cpp )
 
-FIND_PACKAGE( Qt5Core REQUIRED )
-TARGET_INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${Qt5_INCLUDE_DIRS} ${Qt5Core_INCLUDE_DIRS} )
+INCLUDE_DIRECTORIES( ${TARGET} ${Qt5_INCLUDE_DIRS} ${Qt5Core_INCLUDE_DIRS} )
 TARGET_LINK_LIBRARIES( ${TARGET} ${Qt5Core_LIBRARIES} )
 
-FIND_PACKAGE( Eigen3 REQUIRED )
-TARGET_INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${EIGEN3_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${EIGEN3_INCLUDE_DIR} )
 
-FIND_LIBRARY( MNE_FIFF MNE1Fiff ${MNE_CPP_ROOT}/lib )
-FIND_LIBRARY( MNE_MNE MNE1Mne ${MNE_CPP_ROOT}/lib )
-TARGET_INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${MNE_CPP_ROOT}/MNE )
-TARGET_LINK_LIBRARIES( ${TARGET} ${MNE_FIFF} ${MNE_MNE} )
+INCLUDE_DIRECTORIES( ${TARGET} ${MNE_INCLUDE_DIR} )
+TARGET_LINK_LIBRARIES( ${TARGET} ${MNE_FIFF_LIBRARY} ${MNE_LIBRARY} )
 
 
 # --------------------------------------------------------------------------------------------------------------------------------
-# eeg_sensor_transformator
+# nao_eeg_sensor_transformator
 # --------------------------------------------------------------------------------------------------------------------------------
 
 SET( TARGET nao_eeg_sensor_transformator )
 ADD_EXECUTABLE( ${TARGET} eeg_sensor_transformator.cpp )
 
-FIND_PACKAGE( Qt5Core REQUIRED )
-TARGET_INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${Qt5_INCLUDE_DIRS} ${Qt5Core_INCLUDE_DIRS} )
+INCLUDE_DIRECTORIES( ${TARGET} ${Qt5_INCLUDE_DIRS} ${Qt5Core_INCLUDE_DIRS} )
 TARGET_LINK_LIBRARIES( ${TARGET} ${Qt5Core_LIBRARIES} )
 
-FIND_PACKAGE( Eigen3 REQUIRED )
-TARGET_INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${EIGEN3_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${EIGEN3_INCLUDE_DIR} )
 
-FIND_LIBRARY( MNE_FIFF MNE1Fiff ${MNE_CPP_ROOT}/lib )
-TARGET_INCLUDE_DIRECTORIES( ${TARGET} PRIVATE ${MNE_CPP_ROOT}/MNE )
-TARGET_LINK_LIBRARIES( ${TARGET} ${MNE_FIFF} )
+INCLUDE_DIRECTORIES( ${TARGET} ${MNE_INCLUDE_DIR} )
+TARGET_LINK_LIBRARIES( ${TARGET} ${MNE_FIFF_LIBRARY} )
