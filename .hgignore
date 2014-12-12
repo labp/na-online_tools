@@ -1,13 +1,15 @@
-syntax: glob
-
-^bin/
+# Generated output folder
+syntax: regexp
+^build
 
 # Compiled files
+syntax: glob
 *.so
 *.a
 *.o
 
 # IDE project settings
+syntax: glob
 .cproject
 .project
 .settings

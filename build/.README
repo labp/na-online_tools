@@ -1,0 +1,3 @@
+This directory is intended to serve as the place for compilation and executable files.
+
+This .README file is in the build directory so that the directory will be recognized and created by mercurial (hg). Only remove it if you know what you are doing or if the behavior of mercurial concerning empty directories has changed.
