@@ -2,11 +2,19 @@
 syntax: regexp
 ^build
 
+
 # Compiled files
 syntax: glob
 *.so
 *.a
 *.o
+
+
+# Python
+syntax: glob
+__pycache__/
+*.py[cod]
+
 
 # IDE project settings
 syntax: glob
