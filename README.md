@@ -2,7 +2,7 @@ NA-Online: Tools
 ================
 
 - www: http://www.labp.htwk-leipzig.de
-- src: https://github.org/labp
+- src: https://github.com/labp
 
 
 EEG Sensor Generator
