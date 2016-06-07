@@ -1,8 +1,8 @@
 NA-Online: Tools
 ================
 
-WWW: http://www.labp.htwk-leipzig.de   
-SRC: https://bitbucket.org/labp   
+WWW: http://www.labp.htwk-leipzig.de
+SRC: https://github.org/labp
 
 
 EEG Sensor Generator
@@ -25,8 +25,8 @@ Compile
     cd build
     cmake ../src
     make
-    
-    
+
+
 Run
 ---
 
